@@ -10,7 +10,8 @@
         #gameCanvas { display: block; }
         #ui { position: fixed; top: 20px; left: 20px; color: #666; font-size: 18px; z-index: 10; pointer-events: none; }
         #score { font-size: 24px; font-weight: bold; }
-        #lives { margin-top: 10px; font-size: 16px; color: #555; }
+        #coins { margin-top: 8px; font-size: 16px; color: #555; }
+        #lives { margin-top: 8px; font-size: 16px; color: #555; }
         #startScreen, #gameOverScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0c0c0c; z-index: 100; }
         #gameOverScreen { display: none; }
         h1 { font-size: 48px; font-weight: bold; color: #444; }
@@ -25,17 +26,19 @@
     <canvas id="gameCanvas"></canvas>
     <div id="ui">
         <div id="score">SCORE: 0</div>
+        <div id="coins">COINS: 0</div>
         <div id="lives">LIVES: 3</div>
     </div>
     <div id="startScreen">
         <h1>TERMINAL DEFENSE</h1>
-        <div class="subtitle">PROTECT THE CORE</div>
+        <div class="subtitle">SURVIVE THE SWARM</div>
         <button id="startBtn">START GAME</button>
-        <div class="instructions">MOUSE to aim - CLICK to shoot</div>
+        <div class="instructions">MOUSE to aim - CLICK to shoot<br>Collect coins from defeated enemies</div>
     </div>
     <div id="gameOverScreen">
         <h1>GAME OVER</h1>
         <div class="final-score" id="finalScore">SCORE: 0</div>
+        <div class="final-score" id="finalCoins">COINS: 0</div>
         <button id="restartBtn">PLAY AGAIN</button>
     </div>
     <script>
@@ -44,24 +47,24 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        const C = { p: '#555', b: '#666', t: 'rgba(80,80,80,0.2)', e: '#444', core: '#333', cg: 'rgba(50,50,50,0.3)' };
+        const C = { p: '#555', b: '#666', t: 'rgba(80,80,80,0.2)', e: '#444', coin: '#888', coinOutline: '#aaa' };
 
-        const ui = { score: document.getElementById('score'), lives: document.getElementById('lives'), startScreen: document.getElementById('startScreen'), gameOverScreen: document.getElementById('gameOverScreen'), finalScore: document.getElementById('finalScore'), startBtn: document.getElementById('startBtn'), restartBtn: document.getElementById('restartBtn') };
+        const ui = { score: document.getElementById('score'), coins: document.getElementById('coins'), lives: document.getElementById('lives'), startScreen: document.getElementById('startScreen'), gameOverScreen: document.getElementById('gameOverScreen'), finalScore: document.getElementById('finalScore'), finalCoins: document.getElementById('finalCoins'), startBtn: document.getElementById('startBtn'), restartBtn: document.getElementById('restartBtn') };
 
-        let game = { running: false, score: 0, lives: 3, player: null, bullets: [], enemies: [], particles: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
+        let game = { running: false, score: 0, coins: 0, lives: 3, player: null, bullets: [], enemies: [], particles: [], coinsList: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
 
         class Player {
-            constructor() { this.x = canvas.width/2; this.y = canvas.height - 80; this.size = 25; this.angle = -Math.PI/2; }
+            constructor() { this.x = canvas.width/2; this.y = canvas.height/2; this.size = 20; this.angle = -Math.PI/2; }
             draw() {
                 ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                ctx.beginPath(); ctx.moveTo(0, -this.size); ctx.lineTo(-this.size*0.6, this.size*0.7); ctx.lineTo(this.size*0.6, this.size*0.7); ctx.closePath();
+                ctx.beginPath(); ctx.moveTo(0, -this.size); ctx.lineTo(-this.size*0.7, this.size*0.8); ctx.lineTo(this.size*0.7, this.size*0.8); ctx.closePath();
                 ctx.fillStyle = C.p; ctx.fill(); ctx.restore();
             }
             update() { this.angle = Math.atan2(game.mouseY - this.y, game.mouseX - this.x); }
         }
 
         class Bullet {
-            constructor(x, y, angle) { this.x = x; this.y = y; this.angle = angle; this.speed = 10; this.size = 3; this.trail = []; }
+            constructor(x, y, angle) { this.x = x; this.y = y; this.angle = angle; this.speed = 12; this.size = 3; this.trail = []; }
             update() {
                 this.trail.push({x: this.x, y: this.y});
                 if (this.trail.length > 5) this.trail.shift();
@@ -77,15 +80,15 @@
 
         class Enemy {
             constructor() {
-                this.size = 15 + Math.random()*10;
+                this.size = 12 + Math.random()*10;
                 const side = Math.floor(Math.random()*4);
                 if (side === 0) { this.x = Math.random()*canvas.width; this.y = -this.size; }
                 else if (side === 1) { this.x = canvas.width+this.size; this.y = Math.random()*canvas.height; }
                 else if (side === 2) { this.x = Math.random()*canvas.width; this.y = canvas.height+this.size; }
                 else { this.x = -this.size; this.y = Math.random()*canvas.height; }
-                this.speed = 1 + Math.random() + game.score/5000;
-                this.hp = 1; this.angle = 0; this.spinSpeed = (Math.random()-0.5)*0.05;
-                this.gray = 40 + Math.floor(Math.random()*30);
+                this.speed = 1.2 + Math.random()*0.8 + game.score/5000;
+                this.hp = 1; this.angle = 0; this.spinSpeed = (Math.random()-0.5)*0.08;
+                this.gray = 35 + Math.floor(Math.random()*35);
             }
             update(tx, ty) { const a = Math.atan2(ty-this.y, tx-this.x); this.x += Math.cos(a)*this.speed; this.y += Math.sin(a)*this.speed; this.angle += this.spinSpeed; }
             draw() {
@@ -94,6 +97,28 @@
                 for (let i = 0; i < 5; i++) { const ang = (Math.PI*2/5)*i; const r = i%2===0 ? this.size : this.size*0.5; if (i===0) ctx.moveTo(Math.cos(ang)*r, Math.sin(ang)*r); else ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r); }
                 ctx.closePath(); ctx.strokeStyle = `rgb(${this.gray},${this.gray},${this.gray})`; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
             }
+            hits(px, py, s) { return Math.hypot(this.x-px, this.y-py) < this.size + s; }
+        }
+
+        class Coin {
+            constructor(x, y) { this.x = x; this.y = y; this.size = 8; this.vx = (Math.random()-0.5)*4; this.vy = (Math.random()-0.5)*4; this.alpha = 1; this.life = 600; this.collected = false; }
+            update(px, py) {
+                const dist = Math.hypot(this.x-px, this.y-py);
+                if (dist < 150) {
+                    this.vx += (px - this.x) * 0.02;
+                    this.vy += (py - this.y) * 0.02;
+                }
+                this.x += this.vx; this.vx *= 0.98; this.vy *= 0.98; this.life--;
+                if (dist < 20) this.collected = true;
+                if (this.life < 60) this.alpha = this.life/60;
+            }
+            draw() {
+                if (this.collected) return;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fillStyle = C.coin; ctx.fill(); ctx.strokeStyle = C.coinOutline; ctx.lineWidth = 1; ctx.stroke();
+                ctx.beginPath(); ctx.arc(this.x-2, this.y-2, 2, 0, Math.PI*2); ctx.fillStyle = '#aaa'; ctx.fill();
+            }
+            isDead() { return this.life <= 0 || this.collected; }
             hits(px, py, s) { return Math.hypot(this.x-px, this.y-py) < this.size + s; }
         }
 
@@ -110,45 +135,49 @@
             for (let i = game.bullets.length-1; i>=0; i--) {
                 for (let j = game.enemies.length-1; j>=0; j--) {
                     if (Math.hypot(game.bullets[i].x-game.enemies[j].x, game.bullets[i].y-game.enemies[j].y) < game.enemies[j].size+game.bullets[i].size) {
-                        game.bullets.splice(i, 1); spawnP(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
-                        game.enemies.splice(j, 1); game.score += 50; ui.score.textContent = 'SCORE: '+game.score; break;
+                        game.bullets.splice(i, 1);
+                        spawnP(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
+                        game.coinsList.push(new Coin(game.enemies[j].x, game.enemies[j].y));
+                        game.enemies.splice(j, 1);
+                        game.score += 50;
+                        ui.score.textContent = 'SCORE: '+game.score;
+                        break;
                     }
                 }
             }
             for (let i = game.enemies.length-1; i>=0; i--) {
-                if (game.enemies[i].hits(game.player.x, game.player.y, game.player.size) || Math.hypot(game.enemies[i].x-canvas.width/2, game.enemies[i].y-canvas.height/2) < 35) {
+                if (game.enemies[i].hits(game.player.x, game.player.y, game.player.size)) {
                     spawnP(game.player.x, game.player.y, 80, 10); game.enemies.splice(i, 1); game.lives--; ui.lives.textContent = 'LIVES: '+game.lives;
-                    if (game.lives <= 0) { game.running = false; ui.finalScore.textContent = 'SCORE: '+game.score; ui.gameOverScreen.style.display = 'flex'; }
+                    if (game.lives <= 0) { game.running = false; ui.finalScore.textContent = 'SCORE: '+game.score; ui.finalCoins.textContent = 'COINS: '+game.coins; ui.gameOverScreen.style.display = 'flex'; }
                 }
             }
         }
 
         function drawBG() {
             ctx.fillStyle = '#0c0c0c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height/2, 25, 0, Math.PI*2); ctx.strokeStyle = C.core; ctx.lineWidth = 2; ctx.stroke();
-            ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height/2, 32, 0, Math.PI*2); ctx.strokeStyle = C.cg; ctx.lineWidth = 1; ctx.stroke();
         }
 
         function loop(ts) {
             if (!game.running) return;
             drawBG();
-            if (ts - game.lastSpawn > game.enemySpawnRate) { game.enemies.push(new Enemy()); game.lastSpawn = ts; game.enemySpawnRate = Math.max(500, 1500 - game.score/10); }
+            if (ts - game.lastSpawn > game.enemySpawnRate) { game.enemies.push(new Enemy()); game.lastSpawn = ts; game.enemySpawnRate = Math.max(400, 1500 - game.score/10); }
             game.player.update(); game.player.draw();
             game.bullets.forEach((b, i) => { b.update(); b.draw(); if (b.isOffScreen()) game.bullets.splice(i, 1); });
             game.enemies.forEach(e => { e.update(game.player.x, game.player.y); e.draw(); });
+            game.coinsList.forEach((c, i) => { c.update(game.player.x, game.player.y); c.draw(); if (c.isDead()) { if (c.collected) { game.coins++; ui.coins.textContent = 'COINS: '+game.coins; } game.coinsList.splice(i, 1); } });
             game.particles.forEach((p, i) => { p.update(); p.draw(); if (p.isDead()) game.particles.splice(i, 1); });
             checkCollisions();
             requestAnimationFrame(loop);
         }
 
         function start() {
-            game = { running: true, score: 0, lives: 3, player: new Player(), bullets: [], enemies: [], particles: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
-            ui.score.textContent = 'SCORE: 0'; ui.lives.textContent = 'LIVES: 3'; ui.startScreen.style.display = 'none'; ui.gameOverScreen.style.display = 'none';
+            game = { running: true, score: 0, coins: 0, lives: 3, player: new Player(), bullets: [], enemies: [], particles: [], coinsList: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
+            ui.score.textContent = 'SCORE: 0'; ui.coins.textContent = 'COINS: 0'; ui.lives.textContent = 'LIVES: 3'; ui.startScreen.style.display = 'none'; ui.gameOverScreen.style.display = 'none';
             requestAnimationFrame(loop);
         }
 
         canvas.onmousemove = e => { game.mouseX = e.clientX; game.mouseY = e.clientY; };
-        canvas.onclick = () => { if (game.running) game.bullets.push(new Bullet(game.player.x+Math.cos(game.player.angle)*20, game.player.y+Math.sin(game.player.angle)*20, game.player.angle)); };
+        canvas.onclick = () => { if (game.running) game.bullets.push(new Bullet(game.player.x+Math.cos(game.player.angle)*15, game.player.y+Math.sin(game.player.angle)*15, game.player.angle)); };
         ui.startBtn.onclick = start; ui.restartBtn.onclick = start;
         window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
         drawBG();
