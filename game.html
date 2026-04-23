@@ -10,7 +10,7 @@
         #gameCanvas { display: block; }
         #ui { position: fixed; top: 20px; left: 20px; color: #666; font-size: 18px; z-index: 10; pointer-events: none; }
         #score { font-size: 24px; font-weight: bold; }
-        #coins { margin-top: 8px; font-size: 16px; color: #555; }
+        #coins { margin-top: 8px; font-size: 16px; color: #888; }
         #lives { margin-top: 8px; font-size: 16px; color: #555; }
         #startScreen, #gameOverScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0c0c0c; z-index: 100; }
         #gameOverScreen { display: none; }
@@ -33,7 +33,7 @@
         <h1>TERMINAL DEFENSE</h1>
         <div class="subtitle">SURVIVE THE SWARM</div>
         <button id="startBtn">START GAME</button>
-        <div class="instructions">MOUSE to aim - CLICK to shoot<br>Collect coins from defeated enemies</div>
+        <div class="instructions">MOUSE to aim - CLICK to shoot<br>Coins auto-collect</div>
     </div>
     <div id="gameOverScreen">
         <h1>GAME OVER</h1>
@@ -44,143 +44,333 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
 
-        const C = { p: '#555', b: '#666', t: 'rgba(80,80,80,0.2)', e: '#444', coin: '#888', coinOutline: '#aaa' };
+        const COLORS = { player: '#555', bullet: '#666', bulletTrail: 'rgba(80,80,80,0.2)', enemy: '#444', coin: '#888', coinOutline: '#aaa' };
 
-        const ui = { score: document.getElementById('score'), coins: document.getElementById('coins'), lives: document.getElementById('lives'), startScreen: document.getElementById('startScreen'), gameOverScreen: document.getElementById('gameOverScreen'), finalScore: document.getElementById('finalScore'), finalCoins: document.getElementById('finalCoins'), startBtn: document.getElementById('startBtn'), restartBtn: document.getElementById('restartBtn') };
+        const ui = {
+            score: document.getElementById('score'),
+            coins: document.getElementById('coins'),
+            lives: document.getElementById('lives'),
+            startScreen: document.getElementById('startScreen'),
+            gameOverScreen: document.getElementById('gameOverScreen'),
+            finalScore: document.getElementById('finalScore'),
+            finalCoins: document.getElementById('finalCoins'),
+            startBtn: document.getElementById('startBtn'),
+            restartBtn: document.getElementById('restartBtn')
+        };
 
-        let game = { running: false, score: 0, coins: 0, lives: 3, player: null, bullets: [], enemies: [], particles: [], coinsList: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
+        let game = null;
 
         class Player {
-            constructor() { this.x = canvas.width/2; this.y = canvas.height/2; this.size = 20; this.angle = -Math.PI/2; }
-            draw() {
-                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-                ctx.beginPath(); ctx.moveTo(0, -this.size); ctx.lineTo(-this.size*0.7, this.size*0.8); ctx.lineTo(this.size*0.7, this.size*0.8); ctx.closePath();
-                ctx.fillStyle = C.p; ctx.fill(); ctx.restore();
+            constructor() {
+                this.size = 20;
+                this.angle = -Math.PI / 2;
+                this.updatePosition();
             }
-            update() { this.angle = Math.atan2(game.mouseY - this.y, game.mouseX - this.x); }
+            updatePosition() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.beginPath();
+                ctx.moveTo(0, -this.size);
+                ctx.lineTo(-this.size * 0.7, this.size * 0.8);
+                ctx.lineTo(this.size * 0.7, this.size * 0.8);
+                ctx.closePath();
+                ctx.fillStyle = COLORS.player;
+                ctx.fill();
+                ctx.restore();
+            }
+            update(mouseX, mouseY) {
+                this.angle = Math.atan2(mouseY - this.y, mouseX - this.x);
+            }
         }
 
         class Bullet {
-            constructor(x, y, angle) { this.x = x; this.y = y; this.angle = angle; this.speed = 12; this.size = 3; this.trail = []; }
+            constructor(x, y, angle) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.speed = 12;
+                this.size = 3;
+                this.trail = [];
+            }
             update() {
-                this.trail.push({x: this.x, y: this.y});
+                this.trail.push({ x: this.x, y: this.y });
                 if (this.trail.length > 5) this.trail.shift();
                 this.x += Math.cos(this.angle) * this.speed;
                 this.y += Math.sin(this.angle) * this.speed;
             }
             draw() {
-                this.trail.forEach((t, i) => { ctx.beginPath(); ctx.arc(t.x, t.y, this.size * (i/5), 0, Math.PI*2); ctx.fillStyle = C.t; ctx.fill(); });
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fillStyle = C.b; ctx.fill();
+                this.trail.forEach((t, i) => {
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, this.size * (i / 5), 0, Math.PI * 2);
+                    ctx.fillStyle = COLORS.bulletTrail;
+                    ctx.fill();
+                });
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = COLORS.bullet;
+                ctx.fill();
             }
-            isOffScreen() { return this.x < -30 || this.x > canvas.width+30 || this.y < -30 || this.y > canvas.height+30; }
+            isOffScreen() {
+                return this.x < -30 || this.x > canvas.width + 30 || this.y < -30 || this.y > canvas.height + 30;
+            }
         }
 
         class Enemy {
             constructor() {
-                this.size = 12 + Math.random()*10;
-                const side = Math.floor(Math.random()*4);
-                if (side === 0) { this.x = Math.random()*canvas.width; this.y = -this.size; }
-                else if (side === 1) { this.x = canvas.width+this.size; this.y = Math.random()*canvas.height; }
-                else if (side === 2) { this.x = Math.random()*canvas.width; this.y = canvas.height+this.size; }
-                else { this.x = -this.size; this.y = Math.random()*canvas.height; }
-                this.speed = 1.2 + Math.random()*0.8 + game.score/5000;
-                this.hp = 1; this.angle = 0; this.spinSpeed = (Math.random()-0.5)*0.08;
-                this.gray = 35 + Math.floor(Math.random()*35);
+                this.size = 12 + Math.random() * 10;
+                const side = Math.floor(Math.random() * 4);
+                if (side === 0) { this.x = Math.random() * canvas.width; this.y = -this.size; }
+                else if (side === 1) { this.x = canvas.width + this.size; this.y = Math.random() * canvas.height; }
+                else if (side === 2) { this.x = Math.random() * canvas.width; this.y = canvas.height + this.size; }
+                else { this.x = -this.size; this.y = Math.random() * canvas.height; }
+                this.speed = 1.2 + Math.random() * 0.8 + (game ? game.score : 0) / 5000;
+                this.angle = 0;
+                this.spinSpeed = (Math.random() - 0.5) * 0.08;
+                this.gray = 35 + Math.floor(Math.random() * 35);
             }
-            update(tx, ty) { const a = Math.atan2(ty-this.y, tx-this.x); this.x += Math.cos(a)*this.speed; this.y += Math.sin(a)*this.speed; this.angle += this.spinSpeed; }
+            update(tx, ty) {
+                const a = Math.atan2(ty - this.y, tx - this.x);
+                this.x += Math.cos(a) * this.speed;
+                this.y += Math.sin(a) * this.speed;
+                this.angle += this.spinSpeed;
+            }
             draw() {
-                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
                 ctx.beginPath();
-                for (let i = 0; i < 5; i++) { const ang = (Math.PI*2/5)*i; const r = i%2===0 ? this.size : this.size*0.5; if (i===0) ctx.moveTo(Math.cos(ang)*r, Math.sin(ang)*r); else ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r); }
-                ctx.closePath(); ctx.strokeStyle = `rgb(${this.gray},${this.gray},${this.gray})`; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+                for (let i = 0; i < 5; i++) {
+                    const ang = (Math.PI * 2 / 5) * i;
+                    const r = i % 2 === 0 ? this.size : this.size * 0.5;
+                    if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                    else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = `rgb(${this.gray},${this.gray},${this.gray})`;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
             }
-            hits(px, py, s) { return Math.hypot(this.x-px, this.y-py) < this.size + s; }
+            hits(px, py, s) {
+                return Math.hypot(this.x - px, this.y - py) < this.size + s;
+            }
         }
 
         class Coin {
-            constructor(x, y) { this.x = x; this.y = y; this.size = 8; this.vx = (Math.random()-0.5)*4; this.vy = (Math.random()-0.5)*4; this.alpha = 1; this.life = 600; this.collected = false; }
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 8;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.life = 600;
+                this.collected = false;
+            }
             update(px, py) {
-                const dist = Math.hypot(this.x-px, this.y-py);
+                const dist = Math.hypot(this.x - px, this.y - py);
                 if (dist < 150) {
                     this.vx += (px - this.x) * 0.02;
                     this.vy += (py - this.y) * 0.02;
                 }
-                this.x += this.vx; this.vx *= 0.98; this.vy *= 0.98; this.life--;
+                this.x += this.vx;
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+                this.life--;
                 if (dist < 20) this.collected = true;
-                if (this.life < 60) this.alpha = this.life/60;
             }
             draw() {
                 if (this.collected) return;
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
-                ctx.fillStyle = C.coin; ctx.fill(); ctx.strokeStyle = C.coinOutline; ctx.lineWidth = 1; ctx.stroke();
-                ctx.beginPath(); ctx.arc(this.x-2, this.y-2, 2, 0, Math.PI*2); ctx.fillStyle = '#aaa'; ctx.fill();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = COLORS.coin;
+                ctx.fill();
+                ctx.strokeStyle = COLORS.coinOutline;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(this.x - 2, this.y - 2, 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#aaa';
+                ctx.fill();
             }
-            isDead() { return this.life <= 0 || this.collected; }
-            hits(px, py, s) { return Math.hypot(this.x-px, this.y-py) < this.size + s; }
+            isDead() {
+                return this.life <= 0 || this.collected;
+            }
         }
 
         class Particle {
-            constructor(x, y, gray) { this.x = x; this.y = y; this.gray = gray; this.angle = Math.random()*Math.PI*2; this.speed = Math.random()*2; this.size = Math.random()*2+1; this.alpha = 1; this.decay = 0.03; }
-            update() { this.x += Math.cos(this.angle)*this.speed; this.y += Math.sin(this.angle)*this.speed; this.alpha -= this.decay; }
-            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fillStyle = `rgba(${this.gray},${this.gray},${this.gray},${this.alpha})`; ctx.fill(); }
-            isDead() { return this.alpha <= 0; }
+            constructor(x, y, gray) {
+                this.x = x;
+                this.y = y;
+                this.gray = gray;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 2;
+                this.size = Math.random() * 2 + 1;
+                this.alpha = 1;
+                this.decay = 0.03;
+            }
+            update() {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.gray},${this.gray},${this.gray},${this.alpha})`;
+                ctx.fill();
+            }
+            isDead() {
+                return this.alpha <= 0;
+            }
         }
 
-        function spawnP(x, y, gray, n) { for (let i=0; i<n; i++) game.particles.push(new Particle(x, y, gray)); }
+        function spawnParticles(x, y, gray, n) {
+            for (let i = 0; i < n; i++) game.particles.push(new Particle(x, y, gray));
+        }
 
         function checkCollisions() {
-            for (let i = game.bullets.length-1; i>=0; i--) {
-                for (let j = game.enemies.length-1; j>=0; j--) {
-                    if (Math.hypot(game.bullets[i].x-game.enemies[j].x, game.bullets[i].y-game.enemies[j].y) < game.enemies[j].size+game.bullets[i].size) {
+            for (let i = game.bullets.length - 1; i >= 0; i--) {
+                for (let j = game.enemies.length - 1; j >= 0; j--) {
+                    if (Math.hypot(game.bullets[i].x - game.enemies[j].x, game.bullets[i].y - game.enemies[j].y) < game.enemies[j].size + game.bullets[i].size) {
                         game.bullets.splice(i, 1);
-                        spawnP(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
-                        game.coinsList.push(new Coin(game.enemies[j].x, game.enemies[j].y));
+                        spawnParticles(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
+                        game.coins.push(new Coin(game.enemies[j].x, game.enemies[j].y));
                         game.enemies.splice(j, 1);
                         game.score += 50;
-                        ui.score.textContent = 'SCORE: '+game.score;
+                        ui.score.textContent = 'SCORE: ' + game.score;
                         break;
                     }
                 }
             }
-            for (let i = game.enemies.length-1; i>=0; i--) {
+            for (let i = game.enemies.length - 1; i >= 0; i--) {
                 if (game.enemies[i].hits(game.player.x, game.player.y, game.player.size)) {
-                    spawnP(game.player.x, game.player.y, 80, 10); game.enemies.splice(i, 1); game.lives--; ui.lives.textContent = 'LIVES: '+game.lives;
-                    if (game.lives <= 0) { game.running = false; ui.finalScore.textContent = 'SCORE: '+game.score; ui.finalCoins.textContent = 'COINS: '+game.coins; ui.gameOverScreen.style.display = 'flex'; }
+                    spawnParticles(game.player.x, game.player.y, 80, 10);
+                    game.enemies.splice(i, 1);
+                    game.lives--;
+                    ui.lives.textContent = 'LIVES: ' + game.lives;
+                    if (game.lives <= 0) {
+                        game.running = false;
+                        ui.finalScore.textContent = 'SCORE: ' + game.score;
+                        ui.finalCoins.textContent = 'COINS: ' + game.coins;
+                        ui.gameOverScreen.style.display = 'flex';
+                    }
                 }
             }
         }
 
-        function drawBG() {
-            ctx.fillStyle = '#0c0c0c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function drawBackground() {
+            ctx.fillStyle = '#0c0c0c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        function loop(ts) {
+        function gameLoop(timestamp) {
             if (!game.running) return;
-            drawBG();
-            if (ts - game.lastSpawn > game.enemySpawnRate) { game.enemies.push(new Enemy()); game.lastSpawn = ts; game.enemySpawnRate = Math.max(400, 1500 - game.score/10); }
-            game.player.update(); game.player.draw();
-            game.bullets.forEach((b, i) => { b.update(); b.draw(); if (b.isOffScreen()) game.bullets.splice(i, 1); });
-            game.enemies.forEach(e => { e.update(game.player.x, game.player.y); e.draw(); });
-            game.coinsList.forEach((c, i) => { c.update(game.player.x, game.player.y); c.draw(); if (c.isDead()) { if (c.collected) { game.coins++; ui.coins.textContent = 'COINS: '+game.coins; } game.coinsList.splice(i, 1); } });
-            game.particles.forEach((p, i) => { p.update(); p.draw(); if (p.isDead()) game.particles.splice(i, 1); });
+
+            game.player.updatePosition();
+            drawBackground();
+
+            if (timestamp - game.lastSpawn > game.enemySpawnRate) {
+                game.enemies.push(new Enemy());
+                game.lastSpawn = timestamp;
+                game.enemySpawnRate = Math.max(400, 1500 - game.score / 10);
+            }
+
+            game.player.update(game.mouseX, game.mouseY);
+            game.player.draw();
+
+            game.bullets.forEach((b, i) => {
+                b.update();
+                b.draw();
+                if (b.isOffScreen()) game.bullets.splice(i, 1);
+            });
+
+            game.enemies.forEach(e => {
+                e.update(game.player.x, game.player.y);
+                e.draw();
+            });
+
+            game.coins.forEach((c, i) => {
+                c.update(game.player.x, game.player.y);
+                c.draw();
+                if (c.isDead()) {
+                    if (c.collected) {
+                        game.coins++;
+                        ui.coins.textContent = 'COINS: ' + game.coins;
+                    }
+                    game.coins.splice(i, 1);
+                }
+            });
+
+            game.particles.forEach((p, i) => {
+                p.update();
+                p.draw();
+                if (p.isDead()) game.particles.splice(i, 1);
+            });
+
             checkCollisions();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(gameLoop);
         }
 
-        function start() {
-            game = { running: true, score: 0, coins: 0, lives: 3, player: new Player(), bullets: [], enemies: [], particles: [], coinsList: [], enemySpawnRate: 1500, lastSpawn: 0, mouseX: canvas.width/2, mouseY: canvas.height/2 };
-            ui.score.textContent = 'SCORE: 0'; ui.coins.textContent = 'COINS: 0'; ui.lives.textContent = 'LIVES: 3'; ui.startScreen.style.display = 'none'; ui.gameOverScreen.style.display = 'none';
-            requestAnimationFrame(loop);
+        function startGame() {
+            game = {
+                running: true,
+                score: 0,
+                coins: 0,
+                lives: 3,
+                player: new Player(),
+                bullets: [],
+                enemies: [],
+                particles: [],
+                coins: [],
+                enemySpawnRate: 1500,
+                lastSpawn: 0,
+                mouseX: canvas.width / 2,
+                mouseY: canvas.height / 2
+            };
+
+            ui.score.textContent = 'SCORE: 0';
+            ui.coins.textContent = 'COINS: 0';
+            ui.lives.textContent = 'LIVES: 3';
+            ui.startScreen.style.display = 'none';
+            ui.gameOverScreen.style.display = 'none';
+
+            requestAnimationFrame(gameLoop);
         }
 
-        canvas.onmousemove = e => { game.mouseX = e.clientX; game.mouseY = e.clientY; };
-        canvas.onclick = () => { if (game.running) game.bullets.push(new Bullet(game.player.x+Math.cos(game.player.angle)*15, game.player.y+Math.sin(game.player.angle)*15, game.player.angle)); };
-        ui.startBtn.onclick = start; ui.restartBtn.onclick = start;
-        window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-        drawBG();
+        canvas.addEventListener('mousemove', (e) => {
+            if (game) {
+                game.mouseX = e.clientX;
+                game.mouseY = e.clientY;
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (game && game.running) {
+                game.bullets.push(new Bullet(
+                    game.player.x + Math.cos(game.player.angle) * 15,
+                    game.player.y + Math.sin(game.player.angle) * 15,
+                    game.player.angle
+                ));
+            }
+        });
+
+        ui.startBtn.addEventListener('click', startGame);
+        ui.restartBtn.addEventListener('click', startGame);
+
+        drawBackground();
     </script>
 </body>
 </html>
