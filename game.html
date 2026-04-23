@@ -174,18 +174,18 @@
                 this.x = x;
                 this.y = y;
                 this.size = 8;
-                this.vx = (Math.random() - 0.5) * 4;
-                this.vy = (Math.random() - 0.5) * 4;
                 this.life = 600;
                 this.collected = false;
             }
             update(px, py) {
-                const dist = Math.hypot(this.x - px, this.y - py);
-                this.vx += (px - this.x) * 0.015;
-                this.vy += (py - this.y) * 0.015;
-                this.x += this.vx;
-                this.vx *= 0.96;
-                this.vy *= 0.96;
+                const dx = px - this.x;
+                const dy = py - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 1) {
+                    const speed = 3;
+                    this.x += (dx / dist) * speed;
+                    this.y += (dy / dist) * speed;
+                }
                 this.life--;
                 if (dist < 20) this.collected = true;
             }
@@ -303,6 +303,9 @@
             game.coinEntities.forEach((c, i) => {
                 c.update(game.player.x, game.player.y);
                 c.draw();
+            });
+            for (let i = game.coinEntities.length - 1; i >= 0; i--) {
+                const c = game.coinEntities[i];
                 if (c.isDead()) {
                     if (c.collected) {
                         game.coins++;
@@ -310,7 +313,7 @@
                     }
                     game.coinEntities.splice(i, 1);
                 }
-            });
+            }
 
             game.particles.forEach((p, i) => {
                 p.update();
