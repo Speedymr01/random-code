@@ -181,13 +181,11 @@
             }
             update(px, py) {
                 const dist = Math.hypot(this.x - px, this.y - py);
-                if (dist < 150) {
-                    this.vx += (px - this.x) * 0.02;
-                    this.vy += (py - this.y) * 0.02;
-                }
+                this.vx += (px - this.x) * 0.015;
+                this.vy += (py - this.y) * 0.015;
                 this.x += this.vx;
-                this.vx *= 0.98;
-                this.vy *= 0.98;
+                this.vx *= 0.96;
+                this.vy *= 0.96;
                 this.life--;
                 if (dist < 20) this.collected = true;
             }
@@ -247,7 +245,7 @@
                     if (Math.hypot(game.bullets[i].x - game.enemies[j].x, game.bullets[i].y - game.enemies[j].y) < game.enemies[j].size + game.bullets[i].size) {
                         game.bullets.splice(i, 1);
                         spawnParticles(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
-                        game.coins.push(new Coin(game.enemies[j].x, game.enemies[j].y));
+                        game.coinEntities.push(new Coin(game.enemies[j].x, game.enemies[j].y));
                         game.enemies.splice(j, 1);
                         game.score += 50;
                         ui.score.textContent = 'SCORE: ' + game.score;
@@ -302,7 +300,7 @@
                 e.draw();
             });
 
-            game.coins.forEach((c, i) => {
+            game.coinEntities.forEach((c, i) => {
                 c.update(game.player.x, game.player.y);
                 c.draw();
                 if (c.isDead()) {
@@ -310,7 +308,7 @@
                         game.coins++;
                         ui.coins.textContent = 'COINS: ' + game.coins;
                     }
-                    game.coins.splice(i, 1);
+                    game.coinEntities.splice(i, 1);
                 }
             });
 
@@ -334,7 +332,7 @@
                 bullets: [],
                 enemies: [],
                 particles: [],
-                coins: [],
+                coinEntities: [],
                 enemySpawnRate: 1500,
                 lastSpawn: 0,
                 mouseX: canvas.width / 2,
