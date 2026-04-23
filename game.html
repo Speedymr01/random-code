@@ -13,7 +13,7 @@
         }
 
         body {
-            background: #0a0a0f;
+            background: #0c0c0c;
             overflow: hidden;
             font-family: 'Orbitron', monospace;
         }
@@ -26,9 +26,8 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            color: #0ff;
+            color: #ccc;
             font-size: 18px;
-            text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
             z-index: 10;
             pointer-events: none;
         }
@@ -41,8 +40,7 @@
         #lives {
             margin-top: 10px;
             font-size: 16px;
-            color: #f0f;
-            text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+            color: #888;
         }
 
         #startScreen, #gameOverScreen {
@@ -55,7 +53,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: rgba(10, 10, 15, 0.95);
+            background: rgba(12, 12, 12, 0.98);
             z-index: 100;
         }
 
@@ -66,22 +64,12 @@
         h1 {
             font-size: 72px;
             font-weight: 900;
-            background: linear-gradient(90deg, #0ff, #f0f, #ff0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: none;
-            filter: drop-shadow(0 0 30px rgba(0, 255, 255, 0.5));
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            color: #4a4a4a;
+            text-shadow: 0 0 2px #4a4a4a;
         }
 
         .subtitle {
-            color: #666;
+            color: #333;
             font-size: 14px;
             margin-top: 10px;
             letter-spacing: 4px;
@@ -93,9 +81,9 @@
             font-family: 'Orbitron', monospace;
             font-size: 18px;
             font-weight: 700;
-            color: #0ff;
+            color: #666;
             background: transparent;
-            border: 2px solid #0ff;
+            border: 1px solid #333;
             cursor: pointer;
             transition: all 0.3s ease;
             text-transform: uppercase;
@@ -103,14 +91,14 @@
         }
 
         button:hover {
-            background: #0ff;
-            color: #0a0a0f;
-            box-shadow: 0 0 30px #0ff, inset 0 0 30px rgba(0, 255, 255, 0.3);
+            background: #1a1a1a;
+            color: #888;
+            border-color: #555;
         }
 
         .instructions {
             margin-top: 30px;
-            color: #444;
+            color: #333;
             font-size: 12px;
             text-align: center;
             line-height: 2;
@@ -118,8 +106,7 @@
 
         .final-score {
             font-size: 36px;
-            color: #ff0;
-            text-shadow: 0 0 20px #ff0;
+            color: #555;
             margin-top: 20px;
         }
     </style>
@@ -129,12 +116,12 @@
     
     <div id="ui">
         <div id="score">SCORE: 0</div>
-        <div id="lives">LIVES: ♥♥♥</div>
+        <div id="lives">LIVES: 3</div>
     </div>
 
     <div id="startScreen">
-        <h1>NEON PULSE</h1>
-        <div class="subtitle">DEFEND THE CORE</div>
+        <h1>TERMINAL DEFENSE</h1>
+        <div class="subtitle">PROTECT THE CORE</div>
         <button id="startBtn">START GAME</button>
         <div class="instructions">
             MOUSE to aim • CLICK to shoot<br>
@@ -154,6 +141,17 @@
         
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+
+        const COLORS = {
+            player: '#666',
+            bullet: '#888',
+            bulletTrail: 'rgba(100, 100, 100, 0.3)',
+            enemy: '#555',
+            enemyFill: '#333',
+            particle: 'rgba(80, 80, 80, 1)',
+            core: '#444',
+            coreGlow: 'rgba(60, 60, 60, 0.3)'
+        };
 
         const ui = {
             score: document.getElementById('score'),
@@ -198,9 +196,7 @@
                 ctx.lineTo(this.size * 0.7, this.size * 0.8);
                 ctx.closePath();
                 
-                ctx.fillStyle = '#0ff';
-                ctx.shadowColor = '#0ff';
-                ctx.shadowBlur = 20;
+                ctx.fillStyle = COLORS.player;
                 ctx.fill();
                 
                 ctx.restore();
@@ -224,8 +220,8 @@
 
             update() {
                 this.trail.push({ x: this.x, y: this.y, alpha: 1 });
-                if (this.trail.length > 10) this.trail.shift();
-                this.trail.forEach(t => t.alpha -= 0.1);
+                if (this.trail.length > 8) this.trail.shift();
+                this.trail.forEach(t => t.alpha -= 0.12);
 
                 this.x += Math.cos(this.angle) * this.speed;
                 this.y += Math.sin(this.angle) * this.speed;
@@ -234,16 +230,14 @@
             draw() {
                 this.trail.forEach(t => {
                     ctx.beginPath();
-                    ctx.arc(t.x, t.y, this.size * t.alpha, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(0, 255, 255, ${t.alpha * 0.5})`;
+                    ctx.arc(t.x, t.y, this.size * t.alpha * 0.8, 0, Math.PI * 2);
+                    ctx.fillStyle = COLORS.bulletTrail;
                     ctx.fill();
                 });
 
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = '#0ff';
-                ctx.shadowColor = '#0ff';
-                ctx.shadowBlur = 15;
+                ctx.fillStyle = COLORS.bullet;
                 ctx.fill();
             }
 
@@ -268,8 +262,9 @@
                 this.speed = 1.5 + Math.random() * 1.5 + game.score / 5000;
                 this.hp = Math.floor(this.size / 15);
                 this.angle = 0;
-                this.spinSpeed = (Math.random() - 0.5) * 0.1;
-                this.color = `hsl(${280 + Math.random() * 60}, 100%, 60%)`;
+                this.spinSpeed = (Math.random() - 0.5) * 0.08;
+                this.gray = Math.floor(40 + Math.random() * 40);
+                this.color = `rgb(${this.gray}, ${this.gray}, ${this.gray})`;
             }
 
             update(targetX, targetY) {
@@ -296,8 +291,6 @@
                 ctx.closePath();
 
                 ctx.strokeStyle = this.color;
-                ctx.shadowColor = this.color;
-                ctx.shadowBlur = 20;
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
@@ -319,15 +312,15 @@
         }
 
         class Particle {
-            constructor(x, y, color, speed = 3) {
+            constructor(x, y, gray, speed = 2) {
                 this.x = x;
                 this.y = y;
-                this.color = color;
+                this.gray = gray;
                 this.angle = Math.random() * Math.PI * 2;
                 this.speed = Math.random() * speed;
                 this.size = Math.random() * 3 + 1;
                 this.alpha = 1;
-                this.decay = 0.02 + Math.random() * 0.02;
+                this.decay = 0.015 + Math.random() * 0.015;
             }
 
             update() {
@@ -340,9 +333,7 @@
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = this.color.replace('1)', `${this.alpha})`);
-                ctx.shadowColor = this.color;
-                ctx.shadowBlur = 10;
+                ctx.fillStyle = `rgba(${this.gray}, ${this.gray}, ${this.gray}, ${this.alpha})`;
                 ctx.fill();
             }
 
@@ -351,17 +342,17 @@
             }
         }
 
-        function spawnParticles(x, y, color, count = 15) {
+        function spawnParticles(x, y, gray, count = 10) {
             for (let i = 0; i < count; i++) {
-                game.particles.push(new Particle(x, y, color));
+                game.particles.push(new Particle(x, y, gray));
             }
         }
 
         function spawnRing(x, y) {
-            for (let i = 0; i < 30; i++) {
-                const p = new Particle(x, y, 'hsla(0, 100%, 50%, 1)', 5);
-                p.angle = (Math.PI * 2 / 30) * i;
-                p.speed = 4;
+            for (let i = 0; i < 20; i++) {
+                const p = new Particle(x, y, 80, 3);
+                p.angle = (Math.PI * 2 / 20) * i;
+                p.speed = 3;
                 p.size = 2;
                 game.particles.push(p);
             }
@@ -379,10 +370,10 @@
                         game.bullets.splice(i, 1);
                         enemy.hp--;
                         
-                        spawnParticles(enemy.x, enemy.y, enemy.color, 5);
+                        spawnParticles(enemy.x, enemy.y, enemy.gray, 3);
                         
                         if (enemy.hp <= 0) {
-                            spawnParticles(enemy.x, enemy.y, enemy.color, 20);
+                            spawnParticles(enemy.x, enemy.y, enemy.gray, 10);
                             game.enemies.splice(j, 1);
                             game.score += 100;
                             ui.score.textContent = `SCORE: ${game.score}`;
@@ -423,11 +414,11 @@
         }
 
         function updateLives() {
-            ui.lives.textContent = `LIVES: ${'♥'.repeat(game.lives)}${'♡'.repeat(3 - game.lives)}`;
+            ui.lives.textContent = `LIVES: ${game.lives}`;
         }
 
         function drawBackground() {
-            ctx.fillStyle = 'rgba(10, 10, 15, 0.1)';
+            ctx.fillStyle = '#0c0c0c';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const centerX = canvas.width / 2;
@@ -436,16 +427,13 @@
 
             ctx.beginPath();
             ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
-            ctx.strokeStyle = '#f0f';
-            ctx.shadowColor = '#f0f';
-            ctx.shadowBlur = 30;
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = COLORS.core;
+            ctx.lineWidth = 2;
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.arc(centerX, centerY, 40 + Math.sin(time * 2) * 5, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
-            ctx.shadowBlur = 10;
+            ctx.arc(centerX, centerY, 38 + Math.sin(time * 2) * 3, 0, Math.PI * 2);
+            ctx.strokeStyle = COLORS.coreGlow;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -458,7 +446,7 @@
             if (timestamp - game.lastSpawn > game.enemySpawnRate) {
                 game.enemies.push(new Enemy());
                 game.lastSpawn = timestamp;
-                game.enemySpawnRate = Math.max(400, 1500 - game.score / 10);
+                game.enemySpawnRate = Math.max(600, 1500 - game.score / 10);
             }
 
             game.player.update();
