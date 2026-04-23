@@ -1,0 +1,15 @@
+{
+    "powers": [
+        "thunderborne:swift_current",
+        "thunderborne:chain_lightning",
+        "thunderborne:electric_aura",
+        "thunderborne:static_charge"
+    ],
+    "icon": {
+        "item": "minecraft:lightning_rod"
+    },
+    "order": 10,
+    "impact": 2,
+    "name": "Thunderborne",
+    "description": "A being of pure lightning. Swift as the storm and deadly to all who cross your path."
+}

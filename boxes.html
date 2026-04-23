@@ -1,0 +1,885 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boxes - Dots and Boxes Game</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+                --bg: #0a0a0f;
+                --surface: #12121a;
+                --border: #2a2a3a;
+                --text: #808090;
+                --text-dim: #404050;
+                --accent: #60a0f0;
+                --accent2: #f06080;
+                --p1: #60a0f0;
+                --p2: #f06080;
+            }
+            .btn {
+                background: linear-gradient(180deg, #1a1a25 0%, #12121a 100%);
+                border: 1px solid var(--border);
+                color: var(--text);
+                padding: 1rem 2.5rem;
+                font-family: inherit;
+                font-size: 0.8rem;
+                letter-spacing: 0.2em;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                margin: 0.4rem;
+                border-radius: 4px;
+            }
+            .btn:hover, .btn:focus {
+                border-color: var(--accent);
+                color: var(--accent);
+                box-shadow: 0 0 15px rgba(96, 160, 240, 0.15);
+                outline: none;
+            }
+            .btn.primary {
+                background: linear-gradient(180deg, #1a2a40 0%, #0f1a2a 100%);
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+            .btn.primary:hover {
+                background: var(--accent);
+                color: var(--bg);
+                box-shadow: 0 0 20px rgba(96, 160, 240, 0.3);
+            }
+            .btn.ai {
+                background: linear-gradient(180deg, #1a2530 0%, #0f1520 100%);
+            }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                user-select: none;
+            }
+            h1 {
+                font-size: 1.5rem;
+                font-weight: 400;
+                letter-spacing: 0.3em;
+                color: var(--text);
+                margin-bottom: 0.5rem;
+            }
+            .subtitle {
+                font-size: 0.7rem;
+                color: var(--text-dim);
+                letter-spacing: 0.2em;
+                margin-bottom: 2rem;
+            }
+            .screen {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: var(--bg);
+                z-index: 100;
+            }
+            .screen-hidden { display: none; }
+            select {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                color: var(--text);
+                padding: 0.6rem 1rem;
+                font-family: inherit;
+                font-size: 0.75rem;
+                cursor: pointer;
+            }
+            select:focus { outline: none; border-color: var(--accent); }
+            label {
+                font-size: 0.7rem;
+                color: var(--text-dim);
+                display: block;
+                margin-bottom: 0.3rem;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="menuScreen" class="screen" style="display: flex;">
+            <h1>BOXES</h1>
+            <div class="subtitle">DOTS AND BOXES</div>
+            
+            <div>
+                <label>GRID SIZE</label>
+                <select id="gridSize">
+                    <option value="3">3 × 3</option>
+                    <option value="4" selected>4 × 4</option>
+                    <option value="5">5 × 5</option>
+                    <option value="6">6 × 6</option>
+                    <option value="7">7 × 7</option>
+                    <option value="8">8 × 8</option>
+                </select>
+            </div>
+            
+            <div class="mode-buttons">
+                <button class="btn primary" id="btnFriend">VS FRIEND</button>
+                <button class="btn" id="btnBotEasy">VS BOT (EASY)</button>
+                <button class="btn" id="btnBotHard">VS BOT (HARD)</button>
+                <button class="btn ai" id="btnVsAI">VS AI BRAIN</button>
+                <button class="btn ai" id="btnTrainAI">TRAIN AI</button>
+                <button class="btn ai" id="btnImportBrain">IMPORT BRAIN</button>
+                <button class="btn ai" id="btnStopTrain" style="display:none;">STOP</button>
+                <button class="btn ai" id="btnExportBrain" style="display:none;">EXPORT BRAIN</button>
+                <input type="file" id="brainFileInput" accept=".json" style="display:none;">
+            </div>
+            
+            <div class="hint" style="margin-top: 2rem;">
+                DRAW LINES BETWEEN DOTS • COMPLETE BOXES TO SCORE • TRAIN AI FOR SMARTER OPPONENT
+            </div>
+        </div>
+        
+        <div id="gameUI" class="screen" style="display: none;">
+            <div class="scoreboard">
+                <div class="player-score p1" id="p1Score">
+                    <div class="label">PLAYER 1</div>
+                    <div class="score">0</div>
+                </div>
+                <div class="player-score p2" id="p2Score">
+                    <div class="label" id="p2Label">PLAYER 2</div>
+                    <div class="score">0</div>
+                </div>
+            </div>
+            <canvas id="canvas" width="400" height="400"></canvas>
+            <div class="hint" id="statusHint">PLAYER 1'S TURN</div>
+            <button class="btn" id="btnMenu" style="margin-top: 1rem;">MENU</button>
+        </div>
+        
+        <div id="winnerScreen" class="screen" style="display: none;">
+            <div class="winner">
+                <h2 id="winnerText">GAME OVER</h2>
+                <p id="finalScore">0 - 0</p>
+                <div class="btn-row">
+                    <button class="btn" id="btnRematch">REMATCH</button>
+                    <button class="btn primary" id="btnMenuWinner">MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const DOT = '#303040';
+            const DOT_HOVER = '#505070';
+            const LINE_P1 = '#60a0f0';
+            const LINE_P2 = '#f06080';
+            const LINE_P1_DIM = '#203050';
+            const LINE_P2_DIM = '#501525';
+            const BOX_P1 = 'rgba(96, 160, 240, 0.15)';
+            const BOX_P2 = 'rgba(240, 96, 128, 0.15)';
+            const BG = '#12121a';
+            const BORDER = '#1e1e2e';
+            
+            let GRID_SIZE = 4;
+            let DOT_SPACING, DOT_RADIUS, PADDING;
+            
+            let lines = [];
+            let boxes = {};
+            let scores = [0, 0];
+            let currentPlayer = 0;
+            let gameOver = false;
+            let mode = 'friend';
+            
+            let hoveredLine = null;
+            
+            let aiBrain = {};
+            let aiTraining = false;
+            let aiEpisodeCount = 0;
+            let aiGameCount = 0;
+            let aiWonGames = 0;
+            
+            const AI_LEARNING_RATE = 0.1;
+            const AI_DISCOUNT = 0.9;
+            const AI_EPSILON = 0.1;
+            
+            function resizeCanvas() {
+                const size = Math.min(window.innerWidth - 40, window.innerHeight - 200, 500);
+                canvas.width = size;
+                canvas.height = size;
+                PADDING = size * 0.1;
+                const usable = size - PADDING * 2;
+                DOT_SPACING = usable / (GRID_SIZE - 1);
+                DOT_RADIUS = Math.max(3, size * 0.012);
+            }
+            
+            function getDotPos(row, col) {
+                return {
+                    x: PADDING + col * DOT_SPACING,
+                    y: PADDING + row * DOT_SPACING
+                };
+            }
+            
+            function getLineKey(r1, c1, r2, c2) {
+                if (r1 > r2 || c1 > c2) return getLineKey(r2, c2, r1, c1);
+                return `${r1},${c1}-${r2},${c2}`;
+            }
+            
+            function parseLineKey(key) {
+                const [a, b] = key.split('-');
+                const [r1, c1] = a.split(',').map(Number);
+                const [r2, c2] = b.split(',').map(Number);
+                return { r1, c1, r2, c2 };
+            }
+            
+            function isLineDrawn(r1, c1, r2, c2) {
+                return lines.includes(getLineKey(r1, c1, r2, c2));
+            }
+            
+            function getLineAt(x, y) {
+                const slotWidth = DOT_SPACING * 0.42;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const px = getDotPos(r, c);
+                        
+                        if (r < GRID_SIZE - 1 && !isLineDrawn(r, c, r + 1, c)) {
+                            const py = getDotPos(r + 1, c);
+                            if (Math.abs(x - px.x) < slotWidth && y >= px.y && y <= py.y) {
+                                return { r1: r, c1: c, r2: r + 1, c2: c, type: 'v' };
+                            }
+                        }
+                        if (c < GRID_SIZE - 1 && !isLineDrawn(r, c, r, c + 1)) {
+                            const py = getDotPos(r, c + 1);
+                            if (Math.abs(y - px.y) < slotWidth && x >= px.x && x <= py.x) {
+                                return { r1: r, c1: c, r2: r, c2: c + 1, type: 'h' };
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+            
+            function getBoxOwner(r, c) {
+                return boxes[`${r},${c}`];
+            }
+            
+            function completeBoxes() {
+                let completed = false;
+                for (let r = 0; r < GRID_SIZE - 1; r++) {
+                    for (let c = 0; c < GRID_SIZE - 1; c++) {
+                        const key = `${r},${c}`;
+                        if (boxes[key] !== undefined) continue;
+                        
+                        if (isLineDrawn(r, c, r, c + 1) &&
+                            isLineDrawn(r + 1, c, r + 1, c + 1) &&
+                            isLineDrawn(r, c, r + 1, c) &&
+                            isLineDrawn(r, c + 1, r + 1, c + 1)) {
+                            boxes[key] = currentPlayer;
+                            scores[currentPlayer]++;
+                            completed = true;
+                        }
+                    }
+                }
+                return completed;
+            }
+            
+            function draw() {
+                ctx.fillStyle = BG;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                for (let r = 0; r < GRID_SIZE - 1; r++) {
+                    for (let c = 0; c < GRID_SIZE - 1; c++) {
+                        const owner = getBoxOwner(r, c);
+                        if (owner !== undefined) {
+                            const p = getDotPos(r, c);
+                            ctx.fillStyle = owner === 0 ? BOX_P1 : BOX_P2;
+                            ctx.fillRect(p.x, p.y, DOT_SPACING, DOT_SPACING);
+                        }
+                    }
+                }
+                
+                ctx.lineWidth = 4;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const p = getDotPos(r, c);
+                        
+                        if (r < GRID_SIZE - 1 && isLineDrawn(r, c, r + 1, c)) {
+                            const owner = linesOwner[getLineKey(r, c, r + 1, c)];
+                            ctx.strokeStyle = owner === 0 ? LINE_P1 : LINE_P2;
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p.x, p.y + DOT_SPACING);
+                            ctx.stroke();
+                        }
+                        if (c < GRID_SIZE - 1 && isLineDrawn(r, c, r, c + 1)) {
+                            const owner = linesOwner[getLineKey(r, c, r, c + 1)];
+                            ctx.strokeStyle = owner === 0 ? LINE_P1 : LINE_P2;
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p.x + DOT_SPACING, p.y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                if (hoveredLine && !gameOver) {
+                    ctx.strokeStyle = currentPlayer === 0 ? LINE_P1 : LINE_P2;
+                    ctx.globalAlpha = 0.4;
+                    ctx.lineWidth = 6;
+                    const p1 = getDotPos(hoveredLine.r1, hoveredLine.c1);
+                    const p2 = getDotPos(hoveredLine.r2, hoveredLine.c2);
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+                
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const p = getDotPos(r, c);
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, DOT_RADIUS, 0, Math.PI * 2);
+                        ctx.fillStyle = DOT;
+                        ctx.fill();
+                    }
+                }
+                
+                updateUI();
+            }
+            
+            function updateUI() {
+                document.querySelector('#p1Score .score').textContent = scores[0];
+                document.querySelector('#p2Score .score').textContent = scores[1];
+                
+                const p1El = document.getElementById('p1Score');
+                const p2El = document.getElementById('p2Score');
+                const hint = document.getElementById('statusHint');
+                
+                p1El.classList.toggle('active', currentPlayer === 0 && !gameOver);
+                p2El.classList.toggle('active', currentPlayer === 1 && !gameOver);
+                
+                if (gameOver) {
+                    const total = (GRID_SIZE - 1) * (GRID_SIZE - 1);
+                    hint.textContent = 'GAME OVER';
+                } else if (mode === 'friend') {
+                    hint.textContent = currentPlayer === 0 ? "PLAYER 1'S TURN" : "PLAYER 2'S TURN";
+                } else {
+                    hint.textContent = currentPlayer === 0 ? "YOUR TURN" : "BOT THINKING...";
+                }
+            }
+            
+            function getAvailableLines() {
+                const available = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (r < GRID_SIZE - 1 && !isLineDrawn(r, c, r + 1, c)) {
+                            available.push({ r1: r, c1: c, r2: r + 1, c2: c, type: 'v' });
+                        }
+                        if (c < GRID_SIZE - 1 && !isLineDrawn(r, c, r, c + 1)) {
+                            available.push({ r1: r, c1: c, r2: r, c2: c + 1, type: 'h' });
+                        }
+                    }
+                }
+                return available;
+            }
+            
+            function getBoxThirdSides() {
+                const thirdSides = [];
+                for (let r = 0; r < GRID_SIZE - 1; r++) {
+                    for (let c = 0; c < GRID_SIZE - 1; c++) {
+                        if (getBoxOwner(r, c) !== undefined) continue;
+                        
+                        const sides = [
+                            isLineDrawn(r, c, r + 1, c),
+                            isLineDrawn(r, c, r, c + 1),
+                            isLineDrawn(r + 1, c, r + 1, c + 1),
+                            isLineDrawn(r, c + 1, r + 1, c + 1)
+                        ];
+                        const count = sides.filter(Boolean).length;
+                        if (count === 3) {
+                            const missingIndex = sides.indexOf(false);
+                            if (missingIndex === 0) thirdSides.push({ r1: r, c1: c, r2: r + 1, c2: c, type: 'v' });
+                            else if (missingIndex === 1) thirdSides.push({ r1: r, c1: c, r2: r, c2: c + 1, type: 'h' });
+                            else if (missingIndex === 2) thirdSides.push({ r1: r + 1, c1: c, r2: r + 1, c2: c + 1, type: 'v' });
+                            else if (missingIndex === 3) thirdSides.push({ r1: r, c1: c + 1, r2: r + 1, c2: c + 1, type: 'h' });
+                        }
+                    }
+                }
+                return thirdSides;
+            }
+            
+            function findChains() {
+                const chains = [];
+                const visited = new Set();
+                
+                for (let r = 0; r < GRID_SIZE - 1; r++) {
+                    for (let c = 0; c < GRID_SIZE - 1; c++) {
+                        if (getBoxOwner(r, c) !== undefined || visited.has(`${r},${c}`)) continue;
+                        
+                        const sides = [
+                            isLineDrawn(r, c, r + 1, c),
+                            isLineDrawn(r, c, r, c + 1),
+                            isLineDrawn(r + 1, c, r + 1, c + 1),
+                            isLineDrawn(r, c + 1, r + 1, c + 1)
+                        ];
+                        const filled = sides.filter(Boolean).length;
+                        const empty = sides.filter(s => !s).length;
+                        
+                        if (filled > 0 && empty > 0) {
+                            let chainSize = 0;
+                            let startR = r, startC = c;
+                            
+                            const checkChain = (sr, sc) => {
+                                let size = 0;
+                                const stack = [[sr, sc]];
+                                const seen = new Set();
+                                
+                                while (stack.length > 0) {
+                                    const [cr, cc] = stack.pop();
+                                    const key = `${cr},${cc}`;
+                                    if (seen.has(key)) continue;
+                                    seen.add(key);
+                                    
+                                    const bxSides = [
+                                        isLineDrawn(cr, cc, cr + 1, cc),
+                                        isLineDrawn(cr, cc, cr, cc + 1),
+                                        isLineDrawn(cr + 1, cc, cr + 1, cc + 1),
+                                        isLineDrawn(cr, cc + 1, cr + 1, cc + 1)
+                                    ];
+                                    const bFilled = bxSides.filter(Boolean).length;
+                                    const bEmpty = bxSides.filter(s => !s).length;
+                                    
+                                    if (bFilled > 0 && bEmpty > 0) {
+                                        size++;
+                                        if (cr > 0) stack.push([cr - 1, cc]);
+                                        if (cr < GRID_SIZE - 2) stack.push([cr + 1, cc]);
+                                        if (cc > 0) stack.push([cr, cc - 1]);
+                                        if (cc < GRID_SIZE - 2) stack.push([cr, cc + 1]);
+                                    }
+                                }
+                                return size;
+                            };
+                            
+                            chains.push({ r, c, size: checkChain(r, c) });
+                        }
+                    }
+                }
+                
+                chains.sort((a, b) => b.size - a.size);
+                return chains;
+            }
+            
+            let linesOwner = {};
+            
+function makeMove(line) {
+                const key = getLineKey(line.r1, line.c1, line.r2, line.c2);
+                if (lines.includes(key)) return false;
+                
+                lines.push(key);
+                linesOwner[key] = currentPlayer;
+                
+                const completed = completeBoxes();
+                
+                if (!completed) {
+                    currentPlayer = 1 - currentPlayer;
+                }
+                
+                draw();
+                checkGameOver();
+                return true;
+            }
+            
+            function checkGameOver() {
+                const total = (GRID_SIZE - 1) * (GRID_SIZE - 1);
+                const drawnLines = lines.length;
+                const maxLines = GRID_SIZE * (GRID_SIZE - 1) * 2;
+                
+                if (drawnLines >= maxLines || scores[0] + scores[1] >= total) {
+                    gameOver = true;
+                    if (scores[0] + scores[1] < total) {
+                        const usedLines = scores[0] + scores[1];
+                        const remaining = total - usedLines;
+                        if (remaining > 0) {
+                            scores[0] += remaining;
+                        }
+                    }
+                    if (aiTraining) {
+                        stopTraining();
+                    } else {
+                        setTimeout(showWinner, 500);
+                    }
+                }
+            }
+            
+function showWinner() {
+                const winnerEl = document.getElementById('winnerText');
+                const scoreEl = document.getElementById('finalScore');
+                const totalBoxes = (GRID_SIZE - 1) * (GRID_SIZE - 1);
+                
+                scoreEl.textContent = `${scores[0]} - ${scores[1]} (${totalBoxes} boxes)`;
+                
+                if (scores[0] > scores[1]) {
+                    winnerEl.textContent = mode === 'friend' ? 'PLAYER 1 WINS!' : (mode === 'vsai' ? 'YOU WIN!' : 'YOU WIN!');
+                    winnerEl.style.color = 'var(--p1)';
+                } else if (scores[1] > scores[0]) {
+                    winnerEl.textContent = mode === 'friend' ? 'PLAYER 2 WINS!' : (mode === 'vsai' ? 'AI WINS!' : 'BOT WINS!');
+                    winnerEl.style.color = 'var(--p2)';
+                } else {
+                    winnerEl.textContent = 'DRAW!';
+                    winnerEl.style.color = 'var(--text)';
+                }
+            }
+            
+            function botMove() {
+                if (gameOver || currentPlayer !== 1) return;
+                
+                if (mode === 'vsai') {
+                    setTimeout(() => {
+                        if (gameOver) return;
+                        const available = getAvailableLines();
+                        if (available.length === 0) return;
+                        
+                        const state = getStateKey();
+                        const action = aiChooseAction(state, available);
+                        
+                        if (action) {
+                            makeMove(action);
+                            if (!gameOver && currentPlayer === 1) botMove();
+                        }
+                    }, 300);
+                    return;
+                }
+                
+                setTimeout(() => {
+                    if (gameOver) return;
+                    
+                    let line = getBestMove(mode === 'hard');
+                    
+                    if (line) {
+                        makeMove(line);
+                        
+                        if (!gameOver && currentPlayer === 1) {
+                            botMove();
+                        }
+                    }
+                }, 400);
+            }
+            
+            function wouldComplete(line) {
+                const key = getLineKey(line.r1, line.c1, line.r2, line.c2);
+                lines.push(key);
+                linesOwner[key] = 1;
+                
+                let completes = false;
+                const savedBoxes = JSON.parse(JSON.stringify(boxes));
+                
+                for (let r = 0; r < GRID_SIZE - 1; r++) {
+                    for (let c = 0; c < GRID_SIZE - 1; c++) {
+                        if (isLineDrawn(r, c, r, c + 1) &&
+                            isLineDrawn(r + 1, c, r + 1, c + 1) &&
+                            isLineDrawn(r, c, r + 1, c) &&
+                            isLineDrawn(r, c + 1, r + 1, c + 1) &&
+                            !savedBoxes[`${r},${c}`]) {
+                            completes = true;
+                            break;
+                        }
+                    }
+                    if (completes) break;
+                }
+                
+                lines.pop();
+                delete linesOwner[key];
+                if (!completes) {
+                    boxes = savedBoxes;
+                }
+                return completes;
+            }
+            
+            function getBestMove(isHard) {
+                const available = getAvailableLines();
+                if (available.length === 0) return null;
+                
+                if (isHard) {
+                    const thirdSides = getBoxThirdSides();
+                    if (thirdSides.length > 0) {
+                        return thirdSides[Math.floor(Math.random() * thirdSides.length)];
+                    }
+                    
+                    const chains = findChains();
+                    if (chains.length > 0 && chains[0].size >= 2) {
+                        const bestChain = chains[0];
+                        const r = bestChain.r, c = bestChain.c;
+                        const sides = [
+                            isLineDrawn(r, c, r + 1, c),
+                            isLineDrawn(r, c, r, c + 1),
+                            isLineDrawn(r + 1, c, r + 1, c + 1),
+                            isLineDrawn(r, c + 1, r + 1, c + 1)
+                        ];
+                        const missing = sides.map((s, i) => s ? null : {
+                            r1: r + (i === 0 || i === 2 ? 1 : 0),
+                            c1: c + (i === 1 || i === 3 ? 1 : 0),
+                            r2: r + (i === 2 ? 1 : 0),
+                            c2: c + (i === 0 || i === 2 ? 0 : 1),
+                            type: i === 0 || i === 2 ? 'v' : 'h'
+                        }).filter(Boolean);
+                        
+                        if (missing.length > 0) {
+                            return missing[Math.floor(Math.random() * missing.length)];
+                        }
+                    }
+                }
+                
+                const safeAvailable = available.filter(l => !wouldComplete(l));
+                if (safeAvailable.length > 0) {
+                    return safeAvailable[Math.floor(Math.random() * safeAvailable.length)];
+                }
+                
+                return available[Math.floor(Math.random() * available.length)];
+            }
+            
+            function showScreen(screenId) {
+                document.getElementById('menuScreen').style.display = 'none';
+                document.getElementById('gameUI').style.display = 'none';
+                document.getElementById('winnerScreen').style.display = 'none';
+                document.getElementById(screenId).style.display = 'flex';
+            }
+            
+            function initGame(selectedMode) {
+                mode = selectedMode;
+                GRID_SIZE = parseInt(document.getElementById('gridSize').value);
+                
+                resizeCanvas();
+                
+                lines = [];
+                boxes = {};
+                linesOwner = {};
+                scores = [0, 0];
+                currentPlayer = 0;
+                gameOver = false;
+                
+                showScreen('gameUI');
+                
+                if (mode === 'friend') {
+                    document.getElementById('p2Label').textContent = 'PLAYER 2';
+                } else if (mode === 'vsai') {
+                    document.getElementById('p2Label').textContent = 'AI BRAIN';
+                    document.getElementById('btnExportBrain').style.display = 'none';
+                } else {
+                    document.getElementById('p2Label').textContent = mode === 'easy' ? 'BOT (EASY)' : 'BOT (HARD)';
+                }
+                
+                draw();
+                
+                if ((mode === 'vsai' || mode === 'easy' || mode === 'hard') && currentPlayer === 1) {
+                    botMove();
+                }
+            }
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (gameOver) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const newHover = getLineAt(x, y);
+                if (newHover !== hoveredLine) {
+                    hoveredLine = newHover;
+                    draw();
+                }
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                hoveredLine = null;
+                draw();
+            });
+            
+            canvas.addEventListener('click', (e) => {
+                if (gameOver) return;
+                if (mode !== 'friend' && currentPlayer === 1) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const clickedLine = getLineAt(x, y);
+                
+                if (clickedLine) {
+                    makeMove(clickedLine);
+                    
+                    if (!gameOver && mode !== 'friend' && currentPlayer === 1) {
+                        botMove();
+                    }
+                }
+            });
+            
+            document.getElementById('btnFriend').addEventListener('click', () => initGame('friend'));
+            document.getElementById('btnBotEasy').addEventListener('click', () => initGame('easy'));
+            document.getElementById('btnBotHard').addEventListener('click', () => initGame('hard'));
+            document.getElementById('btnVsAI').addEventListener('click', () => initGame('vsai'));
+            document.getElementById('btnTrainAI').addEventListener('click', () => initTraining());
+            document.getElementById('btnStopTrain').addEventListener('click', () => stopTraining());
+            document.getElementById('btnExportBrain').addEventListener('click', () => exportBrain());
+            document.getElementById('btnImportBrain').addEventListener('click', () => {
+                document.getElementById('brainFileInput').click();
+            });
+            document.getElementById('brainFileInput').addEventListener('change', (e) => importBrain(e));
+            
+            function getStateKey() {
+                return lines.sort().join('|');
+            }
+            
+            function aiGetQ(state, action) {
+                const key = state + '|' + action;
+                return aiBrain[key] || 0;
+            }
+            
+            function aiSetQ(state, action, value) {
+                const key = state + '|' + action;
+                aiBrain[key] = value;
+            }
+            
+            function aiChooseAction(state, available) {
+                if (Math.random() < AI_EPSILON && available.length > 0) {
+                    return available[Math.floor(Math.random() * available.length)];
+                }
+                
+                let best = null;
+                let bestQ = -Infinity;
+                for (const a of available) {
+                    const q = aiGetQ(state, a.r1 + ',' + a.c1 + '-' + a.r2 + ',' + a.c2);
+                    if (q > bestQ) {
+                        bestQ = q;
+                        best = a;
+                    }
+                }
+                return best || available[Math.floor(Math.random() * available.length)];
+            }
+            
+            function initTraining() {
+                mode = 'vsai';
+                aiTraining = true;
+                aiGameCount = 0;
+                aiWonGames = 0;
+                GRID_SIZE = parseInt(document.getElementById('gridSize').value);
+                resizeCanvas();
+                showScreen('gameUI');
+                document.getElementById('p2Label').textContent = 'TRAINING: 0 games';
+                document.getElementById('btnExportBrain').style.display = 'inline-block';
+                document.getElementById('btnStopTrain').style.display = 'inline-block';
+                runAITraining();
+            }
+            
+            function stopTraining() {
+                aiTraining = false;
+                document.getElementById('btnStopTrain').style.display = 'none';
+                document.getElementById('btnExportBrain').style.display = 'inline-block';
+            }
+            
+function runAITraining() {
+            if (!aiTraining) {
+                draw();
+                return;
+            }
+            
+            aiGameCount++;
+            
+            lines = [];
+            boxes = {};
+            linesOwner = {};
+            scores = [0, 0];
+            currentPlayer = 0;
+            gameOver = false;
+            
+            let lastState = getStateKey();
+            let lastAction = null;
+            
+            function playStep() {
+                if (!aiTraining) {
+                    draw();
+                    return;
+                }
+                
+                if (gameOver) {
+                    if (aiGameCount % 50 === 0) {
+                        const winRate = ((aiWonGames / 50) * 100).toFixed(0);
+                        document.getElementById('p2Label').textContent = `TRAINED: ${aiGameCount} (${winRate}% WR)`;
+                        aiWonGames = 0;
+                    }
+                    draw();
+                    requestAnimationFrame(runAITraining);
+                    return;
+                }
+                
+                const available = getAvailableLines();
+                if (available.length === 0) {
+                    gameOver = true;
+                    if (scores[0] > scores[1]) aiWonGames++;
+                    draw();
+                    requestAnimationFrame(playStep);
+                    return;
+                }
+                
+                const state = getStateKey();
+                const action = aiChooseAction(state, available);
+                
+                if (lastAction !== null) {
+                    const reward = scores[0] - scores[1];
+                    const actionKey = lastAction.r1 + ',' + lastAction.c1 + '-' + lastAction.r2 + ',' + lastAction.c2;
+                    const oldQ = aiGetQ(lastState, actionKey);
+                    const maxNextQ = Math.max(...available.map(a => aiGetQ(state, a.r1 + ',' + a.c1 + '-' + a.r2 + ',' + a.c2)), 0);
+                    aiSetQ(lastState, actionKey, oldQ + AI_LEARNING_RATE * (reward * 0.1 + AI_DISCOUNT * maxNextQ - oldQ));
+                }
+                
+                lastState = state;
+                lastAction = action;
+                
+                makeMove(action);
+                draw();
+                
+                requestAnimationFrame(playStep);
+            }
+            
+            draw();
+            requestAnimationFrame(playStep);
+        }
+            
+            function exportBrain() {
+                const data = JSON.stringify(aiBrain, null, 2);
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dotsboxes_brain.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            function importBrain(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        aiBrain = JSON.parse(ev.target.result);
+                        alert('Brain loaded! ' + Object.keys(aiBrain).length + ' states');
+                    } catch (err) {
+                        alert('Invalid brain file');
+                    }
+                };
+                reader.readAsText(file);
+            }
+            document.getElementById('btnMenu').addEventListener('click', () => {
+                aiTraining = false;
+                showScreen('menuScreen');
+            });
+            document.getElementById('btnRematch').addEventListener('click', () => initGame(mode));
+            document.getElementById('btnMenuWinner').addEventListener('click', () => {
+                showScreen('menuScreen');
+            });
+            
+            window.addEventListener('resize', resizeCanvas);
+            
+            resizeCanvas();
+        </script>
+    </body>
+    </html>
