@@ -6,24 +6,27 @@
     <title>TERMINAL DEFENSE</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0c0c0c; overflow: hidden; font-family: monospace; }
+        body { background: #0d0d0d; overflow: hidden; font-family: 'Courier New', monospace; }
         #gameCanvas { display: block; }
-        #ui { position: fixed; top: 20px; left: 20px; color: #666; font-size: 18px; z-index: 10; pointer-events: none; }
-        #score { font-size: 24px; font-weight: bold; }
-        #coins { margin-top: 8px; font-size: 16px; color: #888; }
-        #lives { margin-top: 8px; font-size: 16px; color: #555; }
-        #startScreen, #gameOverScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0c0c0c; z-index: 100; }
+        #ui { position: fixed; top: 20px; left: 20px; color: #888; font-size: 14px; z-index: 10; pointer-events: none; letter-spacing: 1px; }
+        #score { font-size: 18px; font-weight: bold; color: #c44; }
+        #coins { margin-top: 6px; font-size: 14px; color: #a55; }
+        #lives { margin-top: 6px; font-size: 14px; color: #666; }
+        #bossBarContainer { position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: #1a1a1a; z-index: 10; }
+        #bossBar { height: 100%; width: 0%; background: #a33; transition: width 0.1s linear; }
+        #startScreen, #gameOverScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0d0d0d; z-index: 100; }
         #gameOverScreen { display: none; }
-        h1 { font-size: 48px; font-weight: bold; color: #444; }
-        .subtitle { color: #333; font-size: 14px; margin-top: 10px; }
-        button { margin-top: 30px; padding: 12px 40px; font-family: monospace; font-size: 16px; color: #555; background: transparent; border: 1px solid #333; cursor: pointer; }
-        button:hover { background: #1a1a1a; color: #777; }
-        .instructions { margin-top: 20px; color: #333; font-size: 12px; text-align: center; }
-        .final-score { font-size: 24px; color: #444; margin-top: 15px; }
+        h1 { font-size: 36px; font-weight: normal; color: #722; letter-spacing: 8px; text-transform: uppercase; }
+        .subtitle { color: #444; font-size: 12px; margin-top: 8px; letter-spacing: 4px; }
+        button { margin-top: 40px; padding: 14px 50px; font-family: 'Courier New', monospace; font-size: 13px; color: #933; background: transparent; border: 1px solid #422; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; transition: all 0.3s; }
+        button:hover { background: #311; color: #c55; border-color: #c55; }
+        .instructions { margin-top: 30px; color: #333; font-size: 11px; text-align: center; letter-spacing: 1px; }
+        .final-score { font-size: 18px; color: #722; margin-top: 12px; letter-spacing: 2px; }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="bossBarContainer"><div id="bossBar"></div></div>
     <div id="ui">
         <div id="score">SCORE: 0</div>
         <div id="coins">COINS: 0</div>
@@ -52,12 +55,13 @@
         resize();
         window.addEventListener('resize', resize);
 
-        const COLORS = { player: '#555', bullet: '#666', bulletTrail: 'rgba(80,80,80,0.2)', enemy: '#444', coin: '#888', coinOutline: '#aaa' };
+        const COLORS = { player: '#844', bullet: '#a55', bulletTrail: 'rgba(170,85,85,0.2)', enemy: '#644', coin: '#a55', coinOutline: '#c77' };
 
         const ui = {
             score: document.getElementById('score'),
             coins: document.getElementById('coins'),
             lives: document.getElementById('lives'),
+            bossBar: document.getElementById('bossBar'),
             startScreen: document.getElementById('startScreen'),
             gameOverScreen: document.getElementById('gameOverScreen'),
             finalScore: document.getElementById('finalScore'),
@@ -129,17 +133,40 @@
         }
 
         class Enemy {
-            constructor() {
-                this.size = 12 + Math.random() * 10;
+            constructor(type = 'normal') {
+                this.type = type;
+                
+                if (type === 'fast') {
+                    this.size = 8 + Math.random() * 4;
+                    this.hp = 1;
+                    this.speed = 3.5 + Math.random() * 1;
+                    this.red = 140 + Math.floor(Math.random() * 40);
+                } else if (type === 'tank') {
+                    this.size = 28 + Math.random() * 12;
+                    this.hp = 3;
+                    this.speed = 0.5 + Math.random() * 0.3;
+                    this.red = 40 + Math.floor(Math.random() * 30);
+                } else if (type === 'boss') {
+                    this.size = 70;
+                    this.hp = 20;
+                    this.speed = 0.4;
+                    this.red = 180;
+                } else {
+                    this.size = 12 + Math.random() * 10;
+                    this.hp = 1;
+                    this.speed = 1.2 + Math.random() * 0.8;
+                    this.red = 80 + Math.floor(Math.random() * 50);
+                }
+                
                 const side = Math.floor(Math.random() * 4);
                 if (side === 0) { this.x = Math.random() * canvas.width; this.y = -this.size; }
                 else if (side === 1) { this.x = canvas.width + this.size; this.y = Math.random() * canvas.height; }
                 else if (side === 2) { this.x = Math.random() * canvas.width; this.y = canvas.height + this.size; }
                 else { this.x = -this.size; this.y = Math.random() * canvas.height; }
-                this.speed = 1.2 + Math.random() * 0.8 + (game ? game.score : 0) / 5000;
+                
+                this.speed += (game ? game.score : 0) / 15000;
                 this.angle = 0;
                 this.spinSpeed = (Math.random() - 0.5) * 0.08;
-                this.gray = 35 + Math.floor(Math.random() * 35);
             }
             update(tx, ty) {
                 const a = Math.atan2(ty - this.y, tx - this.x);
@@ -151,21 +178,67 @@
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
-                ctx.beginPath();
-                for (let i = 0; i < 5; i++) {
-                    const ang = (Math.PI * 2 / 5) * i;
-                    const r = i % 2 === 0 ? this.size : this.size * 0.5;
-                    if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
-                    else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                ctx.strokeStyle = `rgb(${this.red},${this.red * 0.4},${this.red * 0.4})`;
+                ctx.lineWidth = this.type === 'boss' ? 3 : (this.type === 'tank' ? 2.5 : 1.5);
+                
+                if (this.type === 'fast') {
+                    ctx.beginPath();
+                    for (let i = 0; i < 3; i++) {
+                        const ang = (Math.PI * 2 / 3) * i - Math.PI / 2;
+                        if (i === 0) ctx.moveTo(Math.cos(ang) * this.size, Math.sin(ang) * this.size);
+                        else ctx.lineTo(Math.cos(ang) * this.size, Math.sin(ang) * this.size);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                } else if (this.type === 'tank') {
+                    ctx.beginPath();
+                    ctx.rect(-this.size * 0.6, -this.size * 0.6, this.size * 1.2, this.size * 1.2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.rect(-this.size * 0.3, -this.size * 0.3, this.size * 0.6, this.size * 0.6);
+                    ctx.stroke();
+                } else if (this.type === 'boss') {
+                    ctx.beginPath();
+                    for (let i = 0; i < 12; i++) {
+                        const ang = (Math.PI * 2 / 12) * i;
+                        const r = i % 2 === 0 ? this.size : this.size * 0.7;
+                        if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                        else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.35, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const ang = (Math.PI * 2 / 5) * i;
+                        const r = i % 2 === 0 ? this.size : this.size * 0.5;
+                        if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                        else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
                 }
-                ctx.closePath();
-                ctx.strokeStyle = `rgb(${this.gray},${this.gray},${this.gray})`;
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
+                
+                if (this.hp > 1) {
+                    ctx.fillStyle = `rgb(${this.red},${this.red * 0.4},${this.red * 0.4})`;
+                    ctx.font = this.type === 'boss' ? 'bold 24px Courier New' : (this.type === 'tank' ? '14px Courier New' : '10px Courier New');
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.hp, 0, 0);
+                }
+                
                 ctx.restore();
             }
+            
             hits(px, py, s) {
                 return Math.hypot(this.x - px, this.y - py) < this.size + s;
+            }
+            takeDamage() {
+                this.hp--;
+                return this.hp <= 0;
             }
         }
 
@@ -209,10 +282,10 @@
         }
 
         class Particle {
-            constructor(x, y, gray) {
+            constructor(x, y, red) {
                 this.x = x;
                 this.y = y;
-                this.gray = gray;
+                this.red = red;
                 this.angle = Math.random() * Math.PI * 2;
                 this.speed = Math.random() * 2;
                 this.size = Math.random() * 2 + 1;
@@ -227,7 +300,7 @@
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${this.gray},${this.gray},${this.gray},${this.alpha})`;
+                ctx.fillStyle = `rgba(${this.red},${this.red * 0.4},${this.red * 0.4},${this.alpha})`;
                 ctx.fill();
             }
             isDead() {
@@ -235,8 +308,8 @@
             }
         }
 
-        function spawnParticles(x, y, gray, n) {
-            for (let i = 0; i < n; i++) game.particles.push(new Particle(x, y, gray));
+        function spawnParticles(x, y, red, n) {
+            for (let i = 0; i < n; i++) game.particles.push(new Particle(x, y, red));
         }
 
         function checkCollisions() {
@@ -244,18 +317,29 @@
                 for (let j = game.enemies.length - 1; j >= 0; j--) {
                     if (Math.hypot(game.bullets[i].x - game.enemies[j].x, game.bullets[i].y - game.enemies[j].y) < game.enemies[j].size + game.bullets[i].size) {
                         game.bullets.splice(i, 1);
-                        spawnParticles(game.enemies[j].x, game.enemies[j].y, game.enemies[j].gray, 5);
-                        game.coinEntities.push(new Coin(game.enemies[j].x, game.enemies[j].y));
-                        game.enemies.splice(j, 1);
-                        game.score += 50;
-                        ui.score.textContent = 'SCORE: ' + game.score;
+                        spawnParticles(game.enemies[j].x, game.enemies[j].y, game.enemies[j].red, 3);
+                        if (game.enemies[j].takeDamage()) {
+                            const coinCount = game.enemies[j].type === 'boss' ? 10 : (game.enemies[j].type === 'tank' ? 3 : 1);
+                            for (let c = 0; c < coinCount; c++) {
+                                const angle = Math.random() * Math.PI * 2;
+                                const dist = 20 + Math.random() * 40;
+                                game.coinEntities.push(new Coin(
+                                    game.enemies[j].x + Math.cos(angle) * dist,
+                                    game.enemies[j].y + Math.sin(angle) * dist
+                                ));
+                            }
+                            const score = game.enemies[j].type === 'boss' ? 500 : (game.enemies[j].type === 'tank' ? 150 : 50);
+                            game.score += score;
+                            ui.score.textContent = 'SCORE: ' + game.score;
+                            game.enemies.splice(j, 1);
+                        }
                         break;
                     }
                 }
             }
             for (let i = game.enemies.length - 1; i >= 0; i--) {
                 if (game.enemies[i].hits(game.player.x, game.player.y, game.player.size)) {
-                    spawnParticles(game.player.x, game.player.y, 80, 10);
+                    spawnParticles(game.player.x, game.player.y, 160, 10);
                     game.enemies.splice(i, 1);
                     game.lives--;
                     ui.lives.textContent = 'LIVES: ' + game.lives;
@@ -270,7 +354,7 @@
         }
 
         function drawBackground() {
-            ctx.fillStyle = '#0c0c0c';
+            ctx.fillStyle = '#0d0d0d';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
@@ -280,10 +364,35 @@
             game.player.updatePosition();
             drawBackground();
 
+            const BOSS_INTERVAL = 30000;
+            const timeSinceStart = timestamp - game.startTime;
+            const bossProgress = (timeSinceStart % BOSS_INTERVAL) / BOSS_INTERVAL;
+            ui.bossBar.style.width = (bossProgress * 100) + '%';
+
+            if (timeSinceStart > BOSS_INTERVAL * Math.floor(timeSinceStart / BOSS_INTERVAL) + BOSS_INTERVAL - 100 &&
+                timeSinceStart < BOSS_INTERVAL * Math.floor(timeSinceStart / BOSS_INTERVAL) + BOSS_INTERVAL) {
+                if (!game.bossSpawning) {
+                    game.bossSpawning = true;
+                    game.enemies.push(new Enemy('boss'));
+                }
+            } else {
+                game.bossSpawning = false;
+            }
+
             if (timestamp - game.lastSpawn > game.enemySpawnRate) {
-                game.enemies.push(new Enemy());
+                let enemyType = 'normal';
+                const roll = Math.random();
+                const score = game.score;
+                
+                if (score > 500 && roll < 0.2) {
+                    enemyType = 'fast';
+                } else if (score > 300 && roll < 0.35) {
+                    enemyType = 'tank';
+                }
+                
+                game.enemies.push(new Enemy(enemyType));
                 game.lastSpawn = timestamp;
-                game.enemySpawnRate = Math.max(400, 1500 - game.score / 10);
+                game.enemySpawnRate = Math.max(300, 1500 - score / 10);
             }
 
             game.player.update(game.mouseX, game.mouseY);
@@ -338,13 +447,17 @@
                 coinEntities: [],
                 enemySpawnRate: 1500,
                 lastSpawn: 0,
+                bossSpawning: false,
+                startTime: 0,
                 mouseX: canvas.width / 2,
                 mouseY: canvas.height / 2
             };
+            game.startTime = performance.now();
 
             ui.score.textContent = 'SCORE: 0';
             ui.coins.textContent = 'COINS: 0';
             ui.lives.textContent = 'LIVES: 3';
+            ui.bossBar.style.width = '0%';
             ui.startScreen.style.display = 'none';
             ui.gameOverScreen.style.display = 'none';
 
