@@ -15,13 +15,24 @@
         #bossBarContainer { position: fixed; top: 0; left: 0; width: 100%; height: 4px; background: #1a1a1a; z-index: 10; }
         #bossBar { height: 100%; width: 0%; background: #a33; transition: width 0.1s linear; }
         #startScreen, #gameOverScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0d0d0d; z-index: 100; }
+        #upgradeBtn { display: none; }
         #gameOverScreen { display: none; }
-        h1 { font-size: 36px; font-weight: normal; color: #722; letter-spacing: 8px; text-transform: uppercase; }
-        .subtitle { color: #444; font-size: 12px; margin-top: 8px; letter-spacing: 4px; }
-        button { margin-top: 40px; padding: 14px 50px; font-family: 'Courier New', monospace; font-size: 13px; color: #933; background: transparent; border: 1px solid #422; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; transition: all 0.3s; }
+        #upgradeScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: center; align-items: center; background: #0d0d0d; z-index: 100; }
+        .upgrade-title { font-size: 28px; color: #c44; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 30px; }
+        .upgrade-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+        .upgrade-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; border: 2px solid #633; min-width: 400px; }
+        .upgrade-item.owned { border-color: #484; }
+        .upgrade-info { color: #888; font-size: 12px; letter-spacing: 1px; }
+        .upgrade-info b { color: #a55; font-size: 13px; }
+        .upgrade-cost { color: #a55; font-size: 12px; letter-spacing: 1px; }
+        .upgrade-owned { color: #484; font-size: 12px; letter-spacing: 1px; }
+        .hint { color: #555; font-size: 11px; letter-spacing: 2px; margin-top: 10px; }
+        h1 { font-size: 36px; font-weight: normal; color: #c44; letter-spacing: 8px; text-transform: uppercase; }
+        .subtitle { color: #666; font-size: 12px; margin-top: 8px; letter-spacing: 4px; }
+        button { margin-top: 40px; padding: 14px 50px; font-family: 'Courier New', monospace; font-size: 13px; color: #c55; background: transparent; border: 2px solid #633; cursor: pointer; letter-spacing: 2px; text-transform: uppercase; transition: all 0.3s; }
         button:hover { background: #311; color: #c55; border-color: #c55; }
-        .instructions { margin-top: 30px; color: #333; font-size: 11px; text-align: center; letter-spacing: 1px; }
-        .final-score { font-size: 18px; color: #722; margin-top: 12px; letter-spacing: 2px; }
+        .instructions { margin-top: 30px; color: #555; font-size: 11px; text-align: center; letter-spacing: 1px; }
+        .final-score { font-size: 18px; color: #c55; margin-top: 12px; letter-spacing: 2px; }
     </style>
 </head>
 <body>
@@ -31,6 +42,7 @@
         <div id="score">SCORE: 0</div>
         <div id="coins">COINS: 0</div>
         <div id="lives">LIVES: 3</div>
+        <button id="upgradeBtn" style="pointer-events:auto;margin-top:20px;padding:8px 20px;font-size:11px;cursor:pointer;">UPGRADES</button>
     </div>
     <div id="startScreen">
         <h1>TERMINAL DEFENSE</h1>
@@ -38,12 +50,17 @@
         <button id="startBtn">START GAME</button>
         <div class="instructions">MOUSE to aim - CLICK to shoot<br>Coins auto-collect</div>
     </div>
-    <div id="gameOverScreen">
-        <h1>GAME OVER</h1>
-        <div class="final-score" id="finalScore">SCORE: 0</div>
-        <div class="final-score" id="finalCoins">COINS: 0</div>
-        <button id="restartBtn">PLAY AGAIN</button>
-    </div>
+        <div id="gameOverScreen">
+            <h1>GAME OVER</h1>
+            <div class="final-score" id="finalScore">SCORE: 0</div>
+            <div class="final-score" id="finalCoins">COINS: 0</div>
+            <button id="restartBtn">PLAY AGAIN</button>
+        </div>
+        <div id="upgradeScreen">
+            <div class="upgrade-title">UPGRADES</div>
+            <div class="upgrade-list" id="upgradeList"></div>
+            <div class="hint">PRESS ESC OR CLICK TO CLOSE</div>
+        </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -55,7 +72,7 @@
         resize();
         window.addEventListener('resize', resize);
 
-        const COLORS = { player: '#844', bullet: '#a55', bulletTrail: 'rgba(170,85,85,0.2)', enemy: '#644', coin: '#a55', coinOutline: '#c77' };
+        const COLORS = { player: '#c66', bullet: '#a55', bulletTrail: 'rgba(170,85,85,0.2)', enemy: '#644', coin: '#a55', coinOutline: '#c77' };
 
         const ui = {
             score: document.getElementById('score'),
@@ -64,11 +81,21 @@
             bossBar: document.getElementById('bossBar'),
             startScreen: document.getElementById('startScreen'),
             gameOverScreen: document.getElementById('gameOverScreen'),
+            upgradeScreen: document.getElementById('upgradeScreen'),
             finalScore: document.getElementById('finalScore'),
             finalCoins: document.getElementById('finalCoins'),
             startBtn: document.getElementById('startBtn'),
-            restartBtn: document.getElementById('restartBtn')
+            restartBtn: document.getElementById('restartBtn'),
+            upgradeBtn: document.getElementById('upgradeBtn'),
+            upgradeList: document.getElementById('upgradeList')
         };
+
+        const UPGRADES = [
+            { id: 'damage', name: 'DAMAGE', desc: '+1 bullet damage', baseCost: 5, maxLevel: 5, effect: (level) => game.player.damage = 1 + level },
+            { id: 'speed', name: 'FIRE RATE', desc: 'faster shooting', baseCost: 8, maxLevel: 5, effect: (level) => game.player.fireRate = 200 - level * 30 },
+            { id: 'size', name: 'BULLET SIZE', desc: 'larger bullets', baseCost: 4, maxLevel: 5, effect: (level) => game.player.bulletSize = 3 + level * 1.5 },
+            { id: 'health', name: 'MAX HEALTH', desc: '+1 life', baseCost: 20, maxLevel: 3, effect: (level) => game.maxLives = 3 + level }
+        ];
 
         let game = null;
 
@@ -76,6 +103,9 @@
             constructor() {
                 this.size = 20;
                 this.angle = -Math.PI / 2;
+                this.damage = 1;
+                this.fireRate = 200;
+                this.bulletSize = 3;
                 this.updatePosition();
             }
             updatePosition() {
@@ -101,12 +131,12 @@
         }
 
         class Bullet {
-            constructor(x, y, angle) {
+            constructor(x, y, angle, size = 3) {
                 this.x = x;
                 this.y = y;
                 this.angle = angle;
                 this.speed = 12;
-                this.size = 3;
+                this.size = size;
                 this.trail = [];
             }
             update() {
@@ -179,7 +209,7 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
                 ctx.strokeStyle = `rgb(${this.red},${this.red * 0.4},${this.red * 0.4})`;
-                ctx.lineWidth = this.type === 'boss' ? 3 : (this.type === 'tank' ? 2.5 : 1.5);
+                ctx.lineWidth = this.type === 'boss' ? 4 : (this.type === 'tank' ? 3.5 : 2.5);
                 
                 if (this.type === 'fast') {
                     ctx.beginPath();
@@ -236,8 +266,8 @@
             hits(px, py, s) {
                 return Math.hypot(this.x - px, this.y - py) < this.size + s;
             }
-            takeDamage() {
-                this.hp--;
+            takeDamage(damage = 1) {
+                this.hp -= damage;
                 return this.hp <= 0;
             }
         }
@@ -260,7 +290,7 @@
                     this.y += (dy / dist) * speed;
                 }
                 this.life--;
-                if (dist < 20) this.collected = true;
+                if (game && dist < 35) this.collected = true;
             }
             draw() {
                 if (this.collected) return;
@@ -318,7 +348,7 @@
                     if (Math.hypot(game.bullets[i].x - game.enemies[j].x, game.bullets[i].y - game.enemies[j].y) < game.enemies[j].size + game.bullets[i].size) {
                         game.bullets.splice(i, 1);
                         spawnParticles(game.enemies[j].x, game.enemies[j].y, game.enemies[j].red, 3);
-                        if (game.enemies[j].takeDamage()) {
+                        if (game.enemies[j].takeDamage(game.player.damage)) {
                             const coinCount = game.enemies[j].type === 'boss' ? 10 : (game.enemies[j].type === 'tank' ? 3 : 1);
                             for (let c = 0; c < coinCount; c++) {
                                 const angle = Math.random() * Math.PI * 2;
@@ -348,6 +378,7 @@
                         ui.finalScore.textContent = 'SCORE: ' + game.score;
                         ui.finalCoins.textContent = 'COINS: ' + game.coins;
                         ui.gameOverScreen.style.display = 'flex';
+                        ui.upgradeBtn.style.display = 'none';
                     }
                 }
             }
@@ -361,6 +392,33 @@
         function gameLoop(timestamp) {
             if (!game.running) return;
 
+            if (game.lastLoopTime && timestamp - game.lastLoopTime < 16) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            game.lastLoopTime = timestamp;
+
+            if (game.paused) {
+                if (game.pausedAt) {
+                    const pauseDuration = performance.now() - game.pausedAt;
+                    game.startTime += pauseDuration;
+                    game.lastSpawn += pauseDuration;
+                    game.lastShot += pauseDuration;
+                    game.lastFrameTime = performance.now();
+                    game.lastLoopTime = performance.now();
+                    game.pausedAt = null;
+                }
+                drawBackground();
+                game.player.draw();
+                game.enemies.forEach(e => e.draw());
+                game.bullets.forEach(b => b.draw());
+                game.coinEntities.forEach(c => c.draw());
+                game.particles.forEach(p => p.draw());
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            game.lastFrameTime = timestamp;
             game.player.updatePosition();
             drawBackground();
 
@@ -437,9 +495,11 @@
         function startGame() {
             game = {
                 running: true,
+                paused: false,
                 score: 0,
                 coins: 0,
                 lives: 3,
+                maxLives: 3,
                 player: new Player(),
                 bullets: [],
                 enemies: [],
@@ -450,9 +510,18 @@
                 bossSpawning: false,
                 startTime: 0,
                 mouseX: canvas.width / 2,
-                mouseY: canvas.height / 2
+                mouseY: canvas.height / 2,
+                lastShot: 0,
+                lastFrameTime: 0,
+                lastLoopTime: 0,
+                pausedAt: null,
+                upgrades: {}
             };
             game.startTime = performance.now();
+            UPGRADES.forEach(u => {
+                game.upgrades[u.id] = 0;
+                u.effect(0);
+            });
 
             ui.score.textContent = 'SCORE: 0';
             ui.coins.textContent = 'COINS: 0';
@@ -460,6 +529,7 @@
             ui.bossBar.style.width = '0%';
             ui.startScreen.style.display = 'none';
             ui.gameOverScreen.style.display = 'none';
+            ui.upgradeBtn.style.display = 'block';
 
             requestAnimationFrame(gameLoop);
         }
@@ -471,18 +541,91 @@
             }
         });
 
-        canvas.addEventListener('click', () => {
-            if (game && game.running) {
-                game.bullets.push(new Bullet(
-                    game.player.x + Math.cos(game.player.angle) * 15,
-                    game.player.y + Math.sin(game.player.angle) * 15,
-                    game.player.angle
-                ));
+        canvas.addEventListener('click', (e) => {
+            if (e.target.id === 'upgradeBtn' || e.target.closest('#upgradeBtn')) return;
+            if (game && game.running && !game.paused) {
+                const now = performance.now();
+                if (now - game.lastShot >= game.player.fireRate) {
+                    game.bullets.push(new Bullet(
+                        game.player.x + Math.cos(game.player.angle) * 15,
+                        game.player.y + Math.sin(game.player.angle) * 15,
+                        game.player.angle,
+                        game.player.bulletSize
+                    ));
+                    game.lastShot = now;
+                }
             }
         });
 
         ui.startBtn.addEventListener('click', startGame);
         ui.restartBtn.addEventListener('click', startGame);
+
+        function showUpgradeMenu() {
+            if (!game || game.paused === true && ui.upgradeScreen.style.display === 'flex') {
+                ui.upgradeScreen.style.display = 'none';
+                if (game) {
+                    game.paused = false;
+                    requestAnimationFrame(gameLoop);
+                }
+                return;
+            }
+            if (game) {
+                game.paused = true;
+                game.pausedAt = performance.now();
+            }
+            renderUpgrades();
+            ui.upgradeScreen.style.display = 'flex';
+        }
+
+        function renderUpgrades() {
+            ui.upgradeList.innerHTML = '';
+            UPGRADES.forEach(u => {
+                const level = game.upgrades[u.id];
+                const cost = u.baseCost * (level + 1);
+                const owned = level >= u.maxLevel;
+                const canAfford = game.coins >= cost && !owned;
+                const div = document.createElement('div');
+                div.className = 'upgrade-item' + (owned ? ' owned' : '');
+                div.innerHTML = `<div class="upgrade-info"><b>${u.name}</b> ${u.desc}<br>Lvl ${level}/${u.maxLevel}</div>`;
+                if (owned) {
+                    div.innerHTML += `<div class="upgrade-owned">OWNED</div>`;
+                } else {
+                    div.innerHTML += `<div class="upgrade-cost">${cost} COINS</div>`;
+                }
+                if (canAfford) {
+                    div.style.cursor = 'pointer';
+                    div.onclick = () => buyUpgrade(u.id);
+                } else if (!owned) {
+                    div.style.opacity = '0.5';
+                }
+                ui.upgradeList.appendChild(div);
+            });
+        }
+
+        function buyUpgrade(id) {
+            const u = UPGRADES.find(x => x.id === id);
+            const level = game.upgrades[id];
+            const cost = u.baseCost * (level + 1);
+            if (game.coins >= cost && level < u.maxLevel) {
+                game.coins -= cost;
+                game.upgrades[id]++;
+                u.effect(game.upgrades[id]);
+                ui.coins.textContent = 'COINS: ' + game.coins;
+                renderUpgrades();
+            }
+        }
+
+        ui.upgradeBtn.addEventListener('click', showUpgradeMenu);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && game && game.running) {
+                showUpgradeMenu();
+            }
+        });
+
+        ui.upgradeScreen.addEventListener('click', (e) => {
+            if (e.target === ui.upgradeScreen) showUpgradeMenu();
+        });
 
         drawBackground();
     </script>
